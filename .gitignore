@@ -1,0 +1,62 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Django
+*.sqlite3
+*.sqlite3-journal
+/backend/media/
+/backend/staticfiles/
+/backend/.coverage
+htmlcov/
+
+# Celery / Redis
+celerybeat-schedule*
+dump.rdb
+
+# Workspaces: per-task git mirrors and worktrees (never commit)
+/backend/workspaces/
+
+# Environment / secrets  <-- must never be committed
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Testing / type checking / linting
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Android
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/local.properties
+/android/.idea/
+*.apk
+*.aab
+*.keystore

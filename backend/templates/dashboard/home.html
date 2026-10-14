@@ -1,0 +1,48 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<h1>Overview</h1>
+
+<div class="cards">
+  <div class="card"><div class="k">Tasks</div><div class="v">{{ task_total }}</div></div>
+  <div class="card"><div class="k">Total cost (USD)</div><div class="v">${{ usage.cost|floatformat:4 }}</div></div>
+  <div class="card"><div class="k">Tokens</div><div class="v">{{ usage.tokens }}</div></div>
+  <div class="card"><div class="k">Cached tokens</div><div class="v">{{ usage.cached }}</div></div>
+</div>
+
+<h2>By status</h2>
+<table>
+  <thead><tr><th>Status</th><th>Count</th></tr></thead>
+  <tbody>
+  {% for row in status_rows %}
+    <tr>
+      <td><a href="{% url 'dashboard:task-list' %}?status={{ row.value }}">{{ row.label }}</a></td>
+      <td>{{ row.count }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Newest tasks</h2>
+{% if recent %}
+<table>
+  <thead>
+    <tr><th>#</th><th>Task</th><th>Repository</th><th>Owner</th><th>Status</th><th>Created</th></tr>
+  </thead>
+  <tbody>
+  {% for t in recent %}
+    <tr>
+      <td>{{ t.pk }}</td>
+      <td><a href="{% url 'dashboard:task-detail' t.pk %}">{{ t.title|default:t.prompt|truncatechars:64 }}</a></td>
+      <td>{{ t.repository.full_name }}</td>
+      <td>@{{ t.user.username }}</td>
+      <td><span class="chip">{{ t.get_status_display }}</span></td>
+      <td class="muted">{{ t.created_at|date:"Y-m-d H:i" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No tasks yet.</p>
+{% endif %}
+{% endblock %}

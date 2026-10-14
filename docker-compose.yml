@@ -1,0 +1,50 @@
+# CodePilotAI - local/self-hosted infrastructure.
+#
+# Brings up the two stateful dependencies the backend needs (Postgres + Redis).
+# It does NOT build the Django/Celery services: run those natively (see
+# docs/DEPLOYMENT.md) so you can edit code without rebuilding an image.
+#
+#   docker compose up -d
+#
+# Then point your .env at the defaults:
+#   DATABASE_URL=postgres://codepilotai:codepilotai@localhost:5432/codepilotai
+#   REDIS_URL=redis://localhost:6379/0
+#
+# The credentials below are for LOCAL DEVELOPMENT ONLY. Change them before
+# exposing either service to anything but loopback.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: codepilotai
+      POSTGRES_USER: codepilotai
+      POSTGRES_PASSWORD: codepilotai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codepilotai -d codepilotai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:

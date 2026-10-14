@@ -1,0 +1,149 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codepilotai-backend"
+version = "0.1.0"
+description = "Mobile-first agentic AI coding assistant backend"
+requires-python = ">=3.12"
+dependencies = [
+    # Web
+    "Django~=5.2.0",
+    "djangorestframework~=3.18",
+    "drf-spectacular[sidecar]~=0.30",
+    "django-filter~=26.1",
+    "django-cors-headers~=4.9",
+    "django-environ~=0.14",
+    "djangorestframework-simplejwt~=5.5",
+    # Data
+    "psycopg[binary]~=3.3",
+    # Async jobs
+    "celery[redis]~=5.6",
+    # Integrations
+    "httpx~=0.28",
+    "cryptography~=50.0",
+    # Git plumbing
+    # (unidiff removed: apps/git/patch.py hand-rolls the unified-diff parser)
+    # Agent
+    # (langchain/langchain-openai removed: GroqProvider speaks raw httpx;
+    #  only langchain-core message types + langgraph remain, Q20)
+    "langgraph~=1.2",
+    "pydantic~=2.12",
+    # Observability
+    "structlog~=26.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest~=8.4",
+    "pytest-django~=4.14",
+    "pytest-cov~=7.0",
+    # httpx-native HTTP mocking. `responses` was the original choice but it only
+    # patches `requests.adapters.HTTPAdapter.send` and has no httpx support, so it
+    # silently let every GitHub call escape to the live API.
+    "pytest-httpx~=0.35",
+    "freezegun~=1.5",
+    "ruff~=0.15",
+    "mypy~=1.19",
+    "django-stubs[compatible-mypy]~=6.1",
+]
+
+[tool.setuptools]
+packages = ["config", "apps"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["."]
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "ASYNC", # flake8-async
+    "S",    # bandit
+    "BLE",  # blind-except
+    "B",    # bugbear
+    "A",    # builtin-shadowing
+    "C4",   # comprehensions
+    "DJ",   # django
+    "DTZ",  # naive datetimes
+    "EM",   # exception messages
+    "G",    # logging format
+    "PIE",  # misc
+    "PT",   # pytest style
+    "RET",  # return
+    "RUF",  # ruff-specific
+    "SIM",  # simplify
+    "T20",  # print
+    "TID",  # tidy imports
+]
+ignore = [
+    "S101",    # assert: used for internal invariants and in tests
+    "EM101",   # string literal in exception: `raise ValueError("...")` is idiomatic here
+    "EM102",   # f-string in exception: same rationale as EM101
+    "RUF001",  # ambiguous unicode in strings: not a concern in this codebase
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Django models legitimately use mutable class attributes for Meta.indexes,
+# Meta.constraints, and the default manager.
+"**/models.py" = ["RUF012"]
+# Settings files and the OAuth module hold URLs and dev-only sentinel keys that
+# trip the hardcoded-password heuristic without being credentials.
+"config/settings/*" = ["S105", "F403", "F405"]
+"apps/github/oauth.py" = ["S105"]
+# The git layer is a deliberate, audited wrapper around the `git` binary.
+# S603 (subprocess call) and S607 (start process with a partial path) are the
+# two findings that describe exactly what this module exists to do. Every call
+# goes through apps.git.runner.run_git, which pins a hardened environment:
+# no system/global config, no hooks, no terminal prompts, and credentials
+# supplied via GIT_ASKPASS rather than argv so they never reach `ps` output.
+"apps/git/runner.py" = ["S603", "S607"]
+# The verify phase is a deliberate, audited wrapper around the repo's own
+# formatter/linter/test commands. S603 (subprocess call) and S607 (partial
+# path) describe exactly what this module exists to do. Commands come only from
+# detected toolchain config via `suggest_commands`, every argv is allowlisted
+# by first token before it runs, and no shell is ever involved.
+"apps/agent/verify.py" = ["S603", "S607"]
+# S105 fires on the *name* of an environment variable, not on a credential.
+"apps/git/credentials.py" = ["S105"]
+"**/tests/**" = ["S", "PLR2004", "DJ008", "EM101", "EM102"]
+"**/migrations/**" = ["E501", "F401"]
+"manage.py" = ["EM101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["config", "apps"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main", "pydantic.mypy"]
+ignore_missing_imports = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+exclude = ["migrations/"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings.test"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py", "tests.py"]
+testpaths = ["tests"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--import-mode=importlib",
+]
+filterwarnings = ["error::DeprecationWarning:apps.*"]

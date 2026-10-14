@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="app_name">CodePilotAI</string>
+
+    <!-- Navigation destinations -->
+    <string name="dest_auth">auth</string>
+    <string name="dest_repos">repos</string>
+    <string name="dest_new_task">new_task</string>
+    <string name="dest_run">run</string>
+    <string name="dest_approval">approval</string>
+    <string name="dest_result">result</string>
+    <string name="dest_history">history</string>
+
+    <!-- Auth -->
+    <string name="sign_in_with_github">Sign in with GitHub</string>
+    <string name="signing_in">Opening GitHub…</string>
+    <string name="sign_in_failed">Sign-in failed: %1$s</string>
+    <string name="sign_out">Sign out</string>
+
+    <!-- Repos -->
+    <string name="your_repositories">Repositories</string>
+    <string name="new_repository">New repository</string>
+    <string name="sync_repositories">Sync from GitHub</string>
+    <string name="repo_name_hint">Repository name</string>
+    <string name="repo_description_hint">Description (optional)</string>
+    <string name="create">Create</string>
+    <string name="cancel">Cancel</string>
+    <string name="search_repos">Search repositories</string>
+    <string name="no_repositories">No repositories yet. Create one or sync from GitHub.</string>
+    <string name="open_tasks">Tasks</string>
+
+    <!-- New task -->
+    <string name="new_task_title">New task</string>
+    <string name="private_repo">Private</string>
+    <string name="task_prompt_hint">Describe what the agent should do…</string>
+    <string name="task_base_branch_hint">Base branch (default)</string>
+    <string name="start_task">Start task</string>
+    <string name="select_repository">Select repository</string>
+    <string name="voice_input">Dictate task</string>
+    <string name="voice_prompt">Speak your task description</string>
+    <string name="voice_unavailable">Speech recognition isn\'t available on this device.</string>
+
+    <!-- Run -->
+    <string name="run_title">Running agent</string>
+    <string name="show_reasoning">Show thinking</string>
+    <string name="hide_reasoning">Hide thinking</string>
+    <string name="reasoning_toggle_count">%1$s (%2$d)</string>
+
+    <!-- Approval -->
+    <string name="approval_title">Review changes</string>
+    <string name="approve">Approve</string>
+    <string name="reject">Reject</string>
+    <string name="request_edit">Request edit</string>
+    <string name="execute_changes">Apply approved changes</string>
+    <string name="feedback_hint">What should change?…</string>
+    <string name="no_pending_changes">All changes decided.</string>
+
+    <!-- Result -->
+    <string name="result_title">Done</string>
+    <string name="open_pull_request">Open pull request</string>
+    <string name="pr_created" tools:ignore="PluralsCandidate">Pull request #%1$d created</string>
+    <string name="task_failed">Task failed: %1$s</string>
+    <string name="verification_results">Verification</string>
+    <string name="cost_usd">$%1$s</string>
+    <string name="activity_log_title">Activity log</string>
+    <string name="show_activity_log">Show activity log</string>
+    <string name="hide_activity_log">Hide activity log</string>
+    <plurals name="tokens_used">
+        <item quantity="one">%1$d token</item>
+        <item quantity="other">%1$d tokens</item>
+    </plurals>
+    <plurals name="tokens_cached">
+        <item quantity="one">%1$d token reused from the prompt cache</item>
+        <item quantity="other">%1$d tokens reused from the prompt cache</item>
+    </plurals>
+
+    <!-- History -->
+    <string name="history_title">History</string>
+    <string name="empty_history">No tasks yet.</string>
+
+    <!-- Push notifications -->
+    <string name="notification_channel_tasks">Task updates</string>
+    <string name="notification_channel_tasks_description">Alerts when an agent run needs your review, finishes, or fails.</string>
+
+    <!-- Common -->
+    <string name="loading">Loading…</string>
+    <string name="retry">Retry</string>
+
+    <!-- Dynamic labels: run phases (TaskPhase wire values) -->
+    <string name="phase_working">Working</string>
+    <string name="phase_waiting">Waiting</string>
+    <string name="phase_failed">Failed</string>
+    <string name="phase_queued">Queued</string>
+    <string name="phase_planning">Planning</string>
+    <string name="phase_reading_repo">Reading your repository</string>
+    <string name="phase_drafting_changes">Drafting changes</string>
+    <string name="phase_waiting_approval">Waiting for your approval</string>
+    <string name="phase_applying_changes">Applying changes</string>
+    <string name="phase_running_checks">Running formatter and tests</string>
+    <string name="phase_repairing">Repairing failures</string>
+    <string name="phase_committing">Committing</string>
+    <string name="phase_pushing">Pushing and opening the pull request</string>
+    <string name="phase_done">Done</string>
+
+    <!-- Dynamic labels: task statuses (TaskStatus wire values) -->
+    <string name="status_unknown">Unknown</string>
+    <string name="status_draft">Draft</string>
+    <string name="status_queued">Queued</string>
+    <string name="status_running">Running</string>
+    <string name="status_awaiting_approval">Awaiting approval</string>
+    <string name="status_applying">Applying changes</string>
+    <string name="status_verifying">Running checks</string>
+    <string name="status_pushed">Pushed</string>
+    <string name="status_merged">Merged</string>
+    <string name="status_failed">Failed</string>
+    <string name="status_cancelled">Cancelled</string>
+
+    <!-- Dynamic labels: run-event kinds on the live feed -->
+    <string name="event_status">Status</string>
+    <string name="event_phase">Phase</string>
+    <string name="event_agent">Agent</string>
+    <string name="event_thinking">Thinking</string>
+    <string name="event_proposed_change">Proposed change</string>
+    <string name="event_change_decided">Change decided</string>
+    <string name="event_verification">Verification</string>
+    <string name="event_pushed">Pushed</string>
+    <string name="event_message">Message</string>
+    <string name="event_error">Error</string>
+    <string name="event_done">Done</string>
+
+    <!-- Dynamic labels: activity-log lines -->
+    <string name="audit_proposed">Proposed %1$s (+%2$s/-%3$s)</string>
+    <string name="audit_status">Status → %1$s</string>
+    <string name="audit_phase">Phase → %1$s</string>
+    <string name="audit_pushed">Pushed</string>
+    <string name="audit_pushed_branch">Pushed %1$s</string>
+    <string name="audit_pushed_url">%1$s · %2$s</string>
+    <string name="audit_error">Error</string>
+    <string name="audit_error_detail">Error: %1$s</string>
+    <string name="audit_finished">Finished · %1$s</string>
+    <string name="audit_verification_note">Verification: %1$s</string>
+    <string name="audit_verification_checks" tools:ignore="PluralsCandidate">Verification: %1$d/%2$d checks passed</string>
+    <string name="audit_verification_passed">Verification: passed</string>
+    <string name="audit_verification_failed">Verification: failed</string>
+    <string name="audit_decision">%1$s · %2$s</string>
+    <string name="audit_decision_actor">%1$s · %2$s by @%3$s</string>
+    <string name="audit_change">Change</string>
+    <string name="audit_decided">decided</string>
+    <string name="audit_approved">approved</string>
+    <string name="audit_rejected">rejected</string>
+    <string name="audit_edit_requested">edit requested</string>
+    <string name="audit_message">%1$s: %2$s</string>
+    <string name="audit_message_plain">%1$s</string>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Locales the app ships translations for. English is the default/source locale.
+  Add a <locale android:name="xx"/> entry (and a values-xx/ folder) per new
+  translation; Android 13+ then offers a per-app language picker automatically.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+</locale-config>

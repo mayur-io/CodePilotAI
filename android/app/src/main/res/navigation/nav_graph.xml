@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/authFragment">
+
+    <fragment
+        android:id="@+id/authFragment"
+        android:name="dev.codepilotai.ui.auth.AuthFragment"
+        android:label="@string/dest_auth">
+        <action
+            android:id="@+id/action_auth_to_repos"
+            app:destination="@id/reposFragment"
+            app:popUpTo="@id/authFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/reposFragment"
+        android:name="dev.codepilotai.ui.repos.ReposFragment"
+        android:label="@string/dest_repos">
+        <action
+            android:id="@+id/action_repos_to_newTask"
+            app:destination="@id/newTaskFragment" />
+        <action
+            android:id="@+id/action_repos_to_history"
+            app:destination="@id/historyFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/newTaskFragment"
+        android:name="dev.codepilotai.ui.task.NewTaskFragment"
+        android:label="@string/dest_new_task">
+        <action
+            android:id="@+id/action_newTask_to_run"
+            app:destination="@id/runFragment"
+            app:popUpTo="@id/reposFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/runFragment"
+        android:name="dev.codepilotai.ui.run.RunFragment"
+        android:label="@string/dest_run">
+        <argument
+            android:name="taskId"
+            app:argType="long" />
+        <action
+            android:id="@+id/action_run_to_approval"
+            app:destination="@id/approvalFragment" />
+        <action
+            android:id="@+id/action_run_to_result"
+            app:destination="@id/resultFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/approvalFragment"
+        android:name="dev.codepilotai.ui.approval.ApprovalFragment"
+        android:label="@string/dest_approval">
+        <argument
+            android:name="taskId"
+            app:argType="long" />
+        <action
+            android:id="@+id/action_approval_to_run"
+            app:destination="@id/runFragment" />
+        <action
+            android:id="@+id/action_approval_to_result"
+            app:destination="@id/resultFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/resultFragment"
+        android:name="dev.codepilotai.ui.result.ResultFragment"
+        android:label="@string/dest_result">
+        <argument
+            android:name="taskId"
+            app:argType="long" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/historyFragment"
+        android:name="dev.codepilotai.ui.history.HistoryFragment"
+        android:label="@string/dest_history">
+        <action
+            android:id="@+id/action_history_to_result"
+            app:destination="@id/resultFragment" />
+    </fragment>
+
+</navigation>

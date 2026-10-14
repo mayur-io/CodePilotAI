@@ -1,0 +1,97 @@
+{% extends "dashboard/base.html" %}
+{% load dashboard_extras %}
+{% block title %}Task #{{ task.pk }}{% endblock %}
+{% block content %}
+<h1>
+  Task #{{ task.pk }}
+  <span class="chip">{{ task.get_status_display }}</span>
+  <span class="chip">{{ task.get_phase_display }}</span>
+</h1>
+<p class="muted">
+  {{ task.repository.full_name }} · @{{ task.user.username }}
+  · created {{ task.created_at|date:"Y-m-d H:i" }}
+  {% if task.finished_at %}· finished {{ task.finished_at|date:"Y-m-d H:i" }}{% endif %}
+  {% if task.duration_seconds %}· {{ task.duration_seconds|floatformat:1 }}s{% endif %}
+</p>
+
+<div class="grid2">
+  <div class="card">
+    <h2 style="margin-top:0">Prompt</h2>
+    <pre>{{ task.prompt }}</pre>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Result</h2>
+    <p><strong>Branch:</strong> {{ task.branch_name }}</p>
+    {% if task.pr_url %}
+      <p><strong>Pull request:</strong> <a href="{{ task.pr_url }}">#{{ task.pr_number }}</a></p>
+    {% endif %}
+    {% if task.commit_sha %}<p><strong>Commit:</strong> {{ task.commit_sha }}</p>{% endif %}
+    {% if task.error_message %}<p class="banner">{{ task.error_code }}: {{ task.error_message }}</p>{% endif %}
+    {% if task.agent_summary %}<p>{{ task.agent_summary }}</p>{% endif %}
+  </div>
+</div>
+
+<h2>Usage</h2>
+<div class="cards">
+  <div class="card"><div class="k">Cost (USD)</div><div class="v">${{ task.cost_usd|floatformat:4 }}</div></div>
+  <div class="card"><div class="k">Input tokens</div><div class="v">{{ task.input_tokens }}</div></div>
+  <div class="card"><div class="k">Output tokens</div><div class="v">{{ task.output_tokens }}</div></div>
+  <div class="card"><div class="k">Reasoning</div><div class="v">{{ task.reasoning_tokens }}</div></div>
+  <div class="card"><div class="k">Cached</div><div class="v">{{ task.cached_tokens }}</div></div>
+  <div class="card"><div class="k">LLM / tool calls</div><div class="v">{{ task.llm_calls }} / {{ task.tool_calls }}</div></div>
+</div>
+
+<h2>Verification</h2>
+<pre>{{ verification|prettyjson }}</pre>
+
+<h2>Diff stat</h2>
+<pre>{{ diff_stat|prettyjson }}</pre>
+
+<h2>Proposed changes ({{ changes|length }})</h2>
+<table>
+  <thead>
+    <tr><th>#</th><th>Path</th><th>Type</th><th>+/−</th><th>Status</th><th>Decided by</th></tr>
+  </thead>
+  <tbody>
+  {% for c in changes %}
+    <tr>
+      <td>{{ c.order_index }}</td>
+      <td>{{ c.path }}{% if c.previous_path %} <span class="muted">(from {{ c.previous_path }})</span>{% endif %}</td>
+      <td>{{ c.get_change_type_display }}</td>
+      <td>+{{ c.additions }}/−{{ c.deletions }}</td>
+      <td><span class="chip">{{ c.get_status_display }}</span></td>
+      <td>
+        {% if c.decided_by %}@{{ c.decided_by.username }} · {{ c.decided_at|date:"Y-m-d H:i" }}
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="muted">No changes.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Messages</h2>
+{% for m in messages %}
+  <p><span class="chip">{{ m.role }}</span> <span class="muted">{{ m.created_at|date:"Y-m-d H:i" }}</span><br>{{ m.content|linebreaksbr }}</p>
+{% empty %}
+  <p class="muted">No messages.</p>
+{% endfor %}
+
+<h2>Event timeline{% if events_truncated %} <span class="muted">(first {{ events|length }})</span>{% endif %}</h2>
+<table>
+  <thead><tr><th>#</th><th>Kind</th><th>Payload</th><th>When</th></tr></thead>
+  <tbody>
+  {% for e in events %}
+    <tr>
+      <td>{{ e.seq }}</td>
+      <td><span class="chip">{{ e.get_kind_display }}</span></td>
+      <td><pre>{{ e.payload|prettyjson }}</pre></td>
+      <td class="muted">{{ e.created_at|date:"Y-m-d H:i:s" }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4" class="muted">No events.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
