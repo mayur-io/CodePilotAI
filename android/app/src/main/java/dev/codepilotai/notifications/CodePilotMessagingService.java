@@ -37,7 +37,7 @@ public final class CodePilotMessagingService extends FirebaseMessagingService {
         String title = valueOr(data.get("title"), getString(R.string.notification_channel_tasks));
         String body = valueOr(data.get("body"), "");
         String channel = valueOr(data.get("channel_id"), TaskNotifications.DEFAULT_CHANNEL_ID);
-        TaskNotifications.show(this, channel, title, body, data.get("task_id"));
+        TaskNotifications.show(this, channel, title, body, data.get("task_id"), data.get("status"));
     }
 
     private static String valueOr(String value, String fallback) {

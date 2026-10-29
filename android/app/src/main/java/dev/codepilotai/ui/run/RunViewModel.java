@@ -34,12 +34,14 @@ public final class RunViewModel extends ViewModel {
     private final MutableLiveData<Integer> phaseRes = new MutableLiveData<>(R.string.phase_waiting);
     private final MutableLiveData<Boolean> connected = new MutableLiveData<>(false);
     private final Event<Long> approvalRequired = new Event<>();
+    private final Event<Long> clarifyRequired = new Event<>();
     private final Event<String> terminalReached = new Event<>();
 
     private long taskId;
     private int reconnectAttempts;
     private boolean terminalFired;
     private boolean approvalFired;
+    private boolean clarifyFired;
 
     public RunViewModel(TaskRepository tasks) {
         this.tasks = tasks;
@@ -65,6 +67,10 @@ public final class RunViewModel extends ViewModel {
         return approvalRequired.asLiveData();
     }
 
+    public LiveData<Long> clarifyRequired() {
+        return clarifyRequired.asLiveData();
+    }
+
     public LiveData<String> terminalReached() {
         return terminalReached.asLiveData();
     }
@@ -72,6 +78,7 @@ public final class RunViewModel extends ViewModel {
     public void start(long taskId) {
         this.taskId = taskId;
         approvalFired = false;
+        clarifyFired = false;
         terminalFired = false;
         // Replay whatever is cached from a previous visit, then go live.
         disposable.add(
@@ -132,7 +139,10 @@ public final class RunViewModel extends ViewModel {
                     TaskStatus s = TaskStatus.fromWire(String.valueOf(raw));
                     if (s != null) {
                         phaseLabel = Labels.statusLabelRes(s);
-                        if (s == TaskStatus.AWAITING_APPROVAL && !approvalFired) {
+                        if (s == TaskStatus.CLARIFYING && !clarifyFired) {
+                            clarifyFired = true;
+                            clarifyRequired.fire(taskId);
+                        } else if (s == TaskStatus.AWAITING_APPROVAL && !approvalFired) {
                             approvalFired = true;
                             approvalRequired.fire(taskId);
                         } else if (s.isTerminal() && !terminalFired) {

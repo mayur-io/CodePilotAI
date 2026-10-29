@@ -27,6 +27,8 @@ from apps.agent_tasks.serializers import (
     AgentTaskCreateSerializer,
     AgentTaskDetailSerializer,
     AgentTaskSummarySerializer,
+    ClarificationAnswersSerializer,
+    ClarificationSerializer,
     MessageCreateSerializer,
     MessageSerializer,
     ProposedChangeDecisionSerializer,
@@ -215,6 +217,113 @@ class AgentTaskViewSet(
         queryset = task.proposed_changes.order_by("order_index", "id")
         return Response(ProposedChangeSerializer(queryset, many=True).data)
 
+    @action(detail=True, methods=["get"], url_path="questions")
+    @extend_schema(
+        summary="Clarifying questions",
+        description=(
+            "Questions the agent asked before writing code, with their options "
+            "and answers. Returns the latest round first."
+        ),
+        responses=ClarificationSerializer(many=True),
+    )
+    def questions(self, request: Any, pk: int | None = None) -> Response:
+        """Return the task's clarifying questions, newest round first."""
+        task = self.get_object()
+        queryset = task.clarifications.order_by("-round", "order_index", "id")
+        return Response(ClarificationSerializer(queryset, many=True).data)
+
+    @action(detail=True, methods=["post"], url_path="questions/answer")
+    @extend_schema(
+        summary="Answer the clarifying questions",
+        request=ClarificationAnswersSerializer,
+        responses={200: ClarificationSerializer(many=True)},
+    )
+    def answer_questions(self, request: Any, pk: int | None = None) -> Response:
+        """Record the user's answers and resume the run.
+
+        The whole round must be answered in one request: a partially answered
+        batch would send the agent back with an incomplete picture and burn
+        another model call to discover the gap.
+        """
+        serializer = ClarificationAnswersSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        task = self.get_object()
+
+        if not task.awaiting_answers:
+            return Response(
+                {
+                    "error": {
+                        "code": "task_not_awaiting_answers",
+                        "message": (
+                            "The task is not waiting for answers, so there is "
+                            "nothing to submit."
+                        ),
+                    }
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        pending = list(task.pending_clarifications)
+        by_id = {row.pk: row for row in pending}
+        submitted = serializer.validated_data["answers"]
+
+        unknown = [item["id"] for item in submitted if item["id"] not in by_id]
+        if unknown:
+            return Response(
+                {
+                    "error": {
+                        "code": "unknown_question",
+                        "message": f"No outstanding question with id(s): {unknown}.",
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        unanswered = [row.pk for row in pending if row.pk not in {i["id"] for i in submitted}]
+        if unanswered:
+            return Response(
+                {
+                    "error": {
+                        "code": "answers_incomplete",
+                        "message": (
+                            f"{len(unanswered)} question(s) still need an answer "
+                            "before the agent can continue."
+                        ),
+                    }
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        assert_daily_budget(task.user)
+
+        with transaction.atomic():
+            for item in submitted:
+                row = by_id[item["id"]]
+                row.answer_with(item["answer"])
+                row.save(update_fields=["answer", "answered_at"])
+                events.emit_event(
+                    task,
+                    RunEvent.Kind.ANSWERED,
+                    {
+                        "clarification_id": row.pk,
+                        "round": row.round,
+                        "key": row.key,
+                        "answer": row.answer,
+                    },
+                )
+            Message.objects.create(
+                task=task,
+                role=Message.Role.USER,
+                content=task.answered_clarifications_text(),
+                metadata={"kind": "clarification_answers"},
+            )
+            events.set_status(task, AgentTask.Status.QUEUED)
+
+        self._enqueue(task)
+
+        queryset = task.clarifications.order_by("-round", "order_index", "id")
+        return Response(ClarificationSerializer(queryset, many=True).data)
+
     @action(detail=True, methods=["post"], url_path=r"changes/(?P<change_id>\d+)/decide")
     @extend_schema(
         summary="Decide on a proposed change",
@@ -332,6 +441,20 @@ class AgentTaskViewSet(
                     "error": {
                         "code": "task_busy",
                         "message": "Wait for the current run to finish before sending a follow-up.",
+                    }
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if task.awaiting_answers:
+            return Response(
+                {
+                    "error": {
+                        "code": "awaiting_answers",
+                        "message": (
+                            "Answer the pending questions first; the agent will pick "
+                            "up your notes on the next run."
+                        ),
                     }
                 },
                 status=status.HTTP_409_CONFLICT,

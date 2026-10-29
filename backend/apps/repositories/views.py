@@ -72,12 +72,41 @@ class RepositoryViewSet(
 
     @extend_schema(
         summary="List repositories",
-        description="Repositories already connected. Use `sync` to pull the full list from GitHub.",
+        description=(
+            "Repositories already connected. On the first call after signing in "
+            "the local list is empty, so the full list is pulled from GitHub "
+            "before responding. Use `sync` to force a refresh at any time."
+        ),
         responses=RepositorySerializer(many=True),
     )
     def list(self, request: Any, *args: Any, **kwargs: Any) -> Response:
-        """Return a page of connected repositories."""
+        """Return a page of connected repositories, syncing on first use.
+
+        The app opens this screen straight after sign-in and has no separate
+        "import my repos" step, so an empty local list would otherwise show a
+        freshly signed-in user nothing until they found the sync button. Syncing
+        here is idempotent and only fires when there is nothing to show, so it
+        never slows down a normal refresh.
+        """
+        self._sync_if_empty(request)
         return super().list(request, *args, **kwargs)
+
+    def _sync_if_empty(self, request: Any) -> None:
+        """Import from GitHub when this user has no repositories yet.
+
+        Best effort: a GitHub outage or an unconnected account must not turn the
+        list endpoint into an error, so failures are logged and the (empty) list
+        is returned instead. The user can still retry with the sync button.
+        """
+        user = request.user
+        if not user.is_github_connected:
+            return
+        if Repository.objects.filter(user=user).exists():
+            return
+        try:
+            services.sync_repositories_from_github(user)
+        except GitHubError as exc:
+            logger.warning("repository_autosync_failed", user_id=user.pk, reason=str(exc))
 
     @extend_schema(
         summary="Create a repository",

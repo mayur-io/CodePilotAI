@@ -7,6 +7,7 @@
     <string name="dest_repos">repos</string>
     <string name="dest_new_task">new_task</string>
     <string name="dest_run">run</string>
+    <string name="dest_clarify">clarify</string>
     <string name="dest_approval">approval</string>
     <string name="dest_result">result</string>
     <string name="dest_history">history</string>
@@ -80,7 +81,17 @@
 
     <!-- Push notifications -->
     <string name="notification_channel_tasks">Task updates</string>
-    <string name="notification_channel_tasks_description">Alerts when an agent run needs your review, finishes, or fails.</string>
+    <string name="notification_channel_tasks_description">Alerts when an agent run needs your answers or review, finishes, or fails.</string>
+
+    <!-- Clarify: the agent's questions before it writes code -->
+    <string name="clarify_title">A few questions</string>
+    <string name="clarify_intro">The agent needs a couple of answers before it starts. Pick the options that fit.</string>
+    <string name="clarify_submit">Send answers</string>
+    <string name="clarify_custom_hint">Or type your own answer…</string>
+    <string name="clarify_question_required">Please answer every question.</string>
+    <string name="clarify_sent">Answers sent. The agent is starting.</string>
+    <string name="clarify_none">No questions right now.</string>
+    <string name="clarify_waiting">Waiting for your answers</string>
 
     <!-- Common -->
     <string name="loading">Loading…</string>
@@ -92,6 +103,7 @@
     <string name="phase_failed">Failed</string>
     <string name="phase_queued">Queued</string>
     <string name="phase_planning">Planning</string>
+    <string name="phase_clarifying">Asking you a few questions</string>
     <string name="phase_reading_repo">Reading your repository</string>
     <string name="phase_drafting_changes">Drafting changes</string>
     <string name="phase_waiting_approval">Waiting for your approval</string>
@@ -106,6 +118,7 @@
     <string name="status_unknown">Unknown</string>
     <string name="status_draft">Draft</string>
     <string name="status_queued">Queued</string>
+    <string name="status_clarifying">Needs your answers</string>
     <string name="status_running">Running</string>
     <string name="status_awaiting_approval">Awaiting approval</string>
     <string name="status_applying">Applying changes</string>

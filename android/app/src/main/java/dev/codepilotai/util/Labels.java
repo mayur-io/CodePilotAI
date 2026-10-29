@@ -26,6 +26,7 @@ public final class Labels {
         switch (phase) {
             case QUEUED: return R.string.phase_queued;
             case PLAN: return R.string.phase_planning;
+            case CLARIFY: return R.string.phase_clarifying;
             case EXPLORE: return R.string.phase_reading_repo;
             case PROPOSE: return R.string.phase_drafting_changes;
             case AWAIT_APPROVAL: return R.string.phase_waiting_approval;
@@ -48,6 +49,7 @@ public final class Labels {
         switch (status) {
             case DRAFT: return R.string.status_draft;
             case QUEUED: return R.string.status_queued;
+            case CLARIFYING: return R.string.status_clarifying;
             case RUNNING: return R.string.status_running;
             case AWAITING_APPROVAL: return R.string.status_awaiting_approval;
             case APPLYING: return R.string.status_applying;

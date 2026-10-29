@@ -24,9 +24,9 @@ android {
         versionName = "0.1.0"
 
         // Read from local.properties or environment at build time.
-        val apiBaseUrl: String = (project.findProperty("ANDROID_API_BASE_URL") as String?)
+        val apiBaseUrl: String = ((project.findProperty("ANDROID_API_BASE_URL") as String?)
             ?: System.getenv("ANDROID_API_BASE_URL")
-            ?: "http://10.0.2.2:8000/api/v1"
+            ?: "http://10.216.51.215:8000/api/v1").trim()
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
         buildConfigField("String", "DEEP_LINK_SCHEME", "\"codepilotai\"")
     }

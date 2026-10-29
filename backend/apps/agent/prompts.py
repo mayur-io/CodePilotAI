@@ -39,6 +39,7 @@ __all__: list[str] = [
 REASONING_EFFORT_BY_PHASE: dict[str, str] = {
     "queued": "low",
     "plan": "medium",
+    "clarify": "medium",
     "explore": "low",
     "propose": "high",
     "apply": "low",
@@ -98,6 +99,16 @@ PHASE_BRIEFS: dict[str, str] = {
         "Break the task into concrete, repository-aware sub-goals. Look at the repo "
         "map first so the plan refers to files that actually exist. Respond with the "
         "plan only; do not propose changes yet."
+    ),
+    "clarify": (
+        "Before writing any code, decide whether the task leaves a material choice "
+        "open that would change what you build -- language, framework, styling "
+        "approach, data store, auth strategy, target platform, or a behavioural "
+        "detail the user did not specify. If it does, call ask_questions once with "
+        "up to three concrete, tappable questions and stop. If the task is already "
+        "unambiguous, call skip. Do not ask about anything you can settle yourself "
+        "by reading the repository, and do not re-ask a question the user has "
+        "already answered."
     ),
     "explore": (
         "Explore until you can answer three things: which files are involved, what "

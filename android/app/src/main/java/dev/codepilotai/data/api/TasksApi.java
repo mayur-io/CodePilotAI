@@ -2,6 +2,8 @@ package dev.codepilotai.data.api;
 
 import dev.codepilotai.data.api.dto.ChangeDecisionRequest;
 import dev.codepilotai.data.api.dto.ChangeDto;
+import dev.codepilotai.data.api.dto.ClarificationAnswersRequest;
+import dev.codepilotai.data.api.dto.ClarificationDto;
 import dev.codepilotai.data.api.dto.CreateTaskRequest;
 import dev.codepilotai.data.api.dto.FollowUpRequest;
 import dev.codepilotai.data.api.dto.MessageDto;
@@ -30,6 +32,13 @@ public interface TasksApi {
 
     @GET("tasks/{id}/changes/")
     Single<List<ChangeDto>> changes(@Path("id") long id);
+
+    @GET("tasks/{id}/questions/")
+    Single<List<ClarificationDto>> questions(@Path("id") long id);
+
+    @POST("tasks/{id}/questions/answer/")
+    Single<List<ClarificationDto>> answerQuestions(
+            @Path("id") long id, @Body ClarificationAnswersRequest request);
 
     @POST("tasks/{id}/changes/{changeId}/decide/")
     Single<ChangeDto> decide(

@@ -6,6 +6,7 @@ import java.util.Locale;
 public enum TaskStatus {
     DRAFT("draft"),
     QUEUED("queued"),
+    CLARIFYING("clarifying"),
     RUNNING("running"),
     AWAITING_APPROVAL("awaiting_approval"),
     APPLYING("applying"),

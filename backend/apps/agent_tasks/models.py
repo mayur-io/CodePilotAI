@@ -27,6 +27,7 @@ class AgentTask(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
         QUEUED = "queued", "Queued"
+        CLARIFYING = "clarifying", "Needs your answers"
         RUNNING = "running", "Running"
         AWAITING_APPROVAL = "awaiting_approval", "Awaiting approval"
         APPLYING = "applying", "Applying changes"
@@ -39,6 +40,7 @@ class AgentTask(models.Model):
     class Phase(models.TextChoices):
         QUEUED = "queued", "Queued"
         PLAN = "plan", "Planning"
+        CLARIFY = "clarify", "Asking you a few questions"
         EXPLORE = "explore", "Exploring repository"
         PROPOSE = "propose", "Drafting changes"
         AWAIT_APPROVAL = "await_approval", "Waiting for your approval"
@@ -57,6 +59,7 @@ class AgentTask(models.Model):
     IN_PROGRESS_STATUSES: ClassVar[frozenset[str]] = frozenset(
         {
             Status.QUEUED,
+            Status.CLARIFYING,
             Status.RUNNING,
             Status.APPLYING,
             Status.VERIFYING,
@@ -221,6 +224,11 @@ class AgentTask(models.Model):
         return self.status == self.Status.AWAITING_APPROVAL
 
     @property
+    def awaiting_answers(self) -> bool:
+        """True when the task is paused waiting for the user's clarifying answers."""
+        return self.status == self.Status.CLARIFYING
+
+    @property
     def total_tokens(self) -> int:
         """Total tokens consumed by this task."""
         return self.input_tokens + self.output_tokens + self.reasoning_tokens
@@ -245,6 +253,32 @@ class AgentTask(models.Model):
         if self.started_at is None or self.finished_at is None:
             return None
         return (self.finished_at - self.started_at).total_seconds()
+
+    @property
+    def pending_clarifications(self) -> Any:
+        """The outstanding questions for the latest round, if any."""
+        latest = self.clarifications.order_by("-round").values_list("round", flat=True).first()
+        if latest is None:
+            return self.clarifications.none()
+        return self.clarifications.filter(round=latest)
+
+    def answered_clarifications_text(self) -> str:
+        """Render every answered question as constraints for the agent.
+
+        Appended to the task prompt so the agent honours the user's choices
+        (language, styling, auth flow, …) instead of guessing, and so a later
+        round builds on the answers already given.
+        """
+        rows = [
+            row
+            for row in self.clarifications.order_by("round", "order_index", "id")
+            if row.is_answered
+        ]
+        if not rows:
+            return ""
+        lines = ["## Decisions already agreed with the user"]
+        lines += [f"- {row.question.strip()} **{row.answer}**" for row in rows]
+        return "\n".join(lines)
 
     def mark_finished(self, *, status: str | None = None) -> None:
         """Stamp ``finished_at`` and settle the status."""
@@ -399,6 +433,97 @@ class ProposedChange(models.Model):
             self.decided_by = actor
 
 
+class Clarification(models.Model):
+    """One question the agent asks before writing code.
+
+    The agent is a senior engineer, not a code vending machine: for an
+    underspecified ask ("make a login form") the useful move is to pin down
+    language, styling, auth flow, and similar choices *before* proposing diffs.
+    A row here is one such question, its offered options, and (once the user
+    answers) the chosen value.
+
+    Questions are grouped by ``round`` so the UI can show a single batch; the
+    runner re-asks with a fresh round if an answer is still ambiguous.
+    """
+
+    class Kind(models.TextChoices):
+        SINGLE_CHOICE = "single_choice", "Pick one"
+        MULTI_CHOICE = "multi_choice", "Pick any"
+        TEXT = "text", "Free text"
+
+    task = models.ForeignKey(
+        AgentTask,
+        on_delete=models.CASCADE,
+        related_name="clarifications",
+    )
+    order_index = models.PositiveIntegerField(default=0)
+
+    #: Batch number, 1-based. Answers from round N are folded into the prompt
+    #: the agent sees in round N+1, so a second round is always better informed.
+    round = models.PositiveIntegerField(default=1)
+
+    key = models.SlugField(
+        max_length=64,
+        help_text="Stable machine name, e.g. 'language'. Referenced in the prompt.",
+    )
+    question = models.TextField(help_text="The question, phrased for a human.")
+    kind = models.CharField(
+        max_length=16,
+        choices=Kind.choices,
+        default=Kind.SINGLE_CHOICE,
+    )
+    options = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Choices for a choice question: [{'value': ..., 'label': ...}].",
+    )
+    allow_custom = models.BooleanField(
+        default=True,
+        help_text="Whether the user may answer with something not in options.",
+    )
+    rationale = models.TextField(
+        blank=True,
+        default="",
+        help_text="Why the agent is asking; shown as supporting text.",
+    )
+
+    answer = models.TextField(
+        blank=True,
+        default="",
+        help_text="The user's answer. Empty while the question is outstanding.",
+    )
+    answered_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "agent_tasks_clarification"
+        ordering = ("round", "order_index", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("task", "round", "key"),
+                name="uniq_clarification_per_task_round_key",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("task", "round"), name="clarify_task_round_idx"),
+        ]
+        verbose_name = "clarification question"
+        verbose_name_plural = "clarification questions"
+
+    def __str__(self) -> str:
+        return f"{self.task_id}#r{self.round} {self.key}"
+
+    @property
+    def is_answered(self) -> bool:
+        """True once the user has supplied a non-empty answer."""
+        return bool(self.answer.strip())
+
+    def answer_with(self, value: str) -> None:
+        """Record the user's answer and stamp when it arrived."""
+        self.answer = value.strip()
+        self.answered_at = timezone.now()
+
+
 class RunEvent(models.Model):
     """An append-only event stream for one task; the source of the SSE feed.
 
@@ -413,6 +538,8 @@ class RunEvent(models.Model):
         REASONING = "reasoning", "Reasoning trace"
         CHANGE_PROPOSED = "change_proposed", "Change proposed"
         CHANGE_DECIDED = "change_decided", "Change decided"
+        CLARIFICATION = "clarification", "Question asked"
+        ANSWERED = "answered", "Question answered"
         VERIFICATION = "verification", "Verification result"
         PUSHED = "pushed", "Pushed to GitHub"
         MESSAGE = "message", "Chat message"

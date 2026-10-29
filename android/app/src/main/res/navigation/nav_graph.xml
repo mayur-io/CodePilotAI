@@ -48,8 +48,25 @@
             android:id="@+id/action_run_to_approval"
             app:destination="@id/approvalFragment" />
         <action
+            android:id="@+id/action_run_to_clarify"
+            app:destination="@id/clarifyFragment" />
+        <action
             android:id="@+id/action_run_to_result"
             app:destination="@id/resultFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/clarifyFragment"
+        android:name="dev.codepilotai.ui.clarify.ClarifyFragment"
+        android:label="@string/dest_clarify">
+        <argument
+            android:name="taskId"
+            app:argType="long" />
+        <action
+            android:id="@+id/action_clarify_to_run"
+            app:destination="@id/runFragment"
+            app:popUpTo="@id/runFragment"
+            app:popUpToInclusive="true" />
     </fragment>
 
     <fragment

@@ -7,6 +7,7 @@ import dev.codepilotai.data.prefs.TokenStore;
 import dev.codepilotai.data.repo.DevicesRepository;
 import dev.codepilotai.ui.approval.ApprovalViewModel;
 import dev.codepilotai.ui.auth.AuthViewModel;
+import dev.codepilotai.ui.clarify.ClarifyViewModel;
 import dev.codepilotai.ui.history.HistoryViewModel;
 import dev.codepilotai.ui.repos.ReposViewModel;
 import dev.codepilotai.ui.run.RunViewModel;
@@ -40,6 +41,7 @@ public interface AppComponent {
     NewTaskViewModel.Factory newTaskViewModelFactory();
     RunViewModel.Factory runViewModelFactory();
     ApprovalViewModel.Factory approvalViewModelFactory();
+    ClarifyViewModel.Factory clarifyViewModelFactory();
     ResultViewModel.Factory resultViewModelFactory();
     HistoryViewModel.Factory historyViewModelFactory();
 }

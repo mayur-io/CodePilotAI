@@ -4,6 +4,7 @@ package dev.codepilotai.domain.model;
 public enum TaskPhase {
     QUEUED("queued"),
     PLAN("plan"),
+    CLARIFY("clarify"),
     EXPLORE("explore"),
     PROPOSE("propose"),
     AWAIT_APPROVAL("await_approval"),

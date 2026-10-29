@@ -8,6 +8,7 @@ import dev.codepilotai.data.repo.ReposRepository;
 import dev.codepilotai.data.repo.TaskRepository;
 import dev.codepilotai.ui.approval.ApprovalViewModel;
 import dev.codepilotai.ui.auth.AuthViewModel;
+import dev.codepilotai.ui.clarify.ClarifyViewModel;
 import dev.codepilotai.ui.history.HistoryViewModel;
 import dev.codepilotai.ui.repos.ReposViewModel;
 import dev.codepilotai.ui.result.ResultViewModel;
@@ -47,6 +48,12 @@ public final class ViewModelModule {
     @Singleton
     static ApprovalViewModel.Factory approvalFactory(TaskRepository tasks) {
         return new ApprovalViewModel.Factory(tasks);
+    }
+
+    @Provides
+    @Singleton
+    static ClarifyViewModel.Factory clarifyFactory(TaskRepository tasks) {
+        return new ClarifyViewModel.Factory(tasks);
     }
 
     @Provides

@@ -117,10 +117,32 @@ def announce_change(task: AgentTask, change: Any) -> None:
         emit_event(task, RunEvent.Kind.CHANGE_PROPOSED, payload)
 
 
+def announce_clarification(task: AgentTask, question: Any) -> None:
+    """Announce one clarifying question so the ask UI can render it."""
+    payload = {
+        "clarification_id": question.pk,
+        "round": question.round,
+        "key": question.key,
+        "question": question.question,
+        "kind": question.kind,
+        "options": question.options,
+        "allow_custom": question.allow_custom,
+        "rationale": question.rationale,
+    }
+    with transaction.atomic():
+        emit_event(task, RunEvent.Kind.CLARIFICATION, payload)
+
+
 def _now() -> Any:
     from django.utils import timezone
 
     return timezone.now()
 
 
-__all__ = ["announce_change", "emit_event", "set_phase", "set_status"]
+__all__ = [
+    "announce_change",
+    "announce_clarification",
+    "emit_event",
+    "set_phase",
+    "set_status",
+]

@@ -6,7 +6,72 @@ from typing import Any
 
 from rest_framework import serializers
 
-from apps.agent_tasks.models import AgentTask, Message, ProposedChange, RunEvent
+from apps.agent_tasks.models import AgentTask, Clarification, Message, ProposedChange, RunEvent
+
+
+class ClarificationSerializer(serializers.ModelSerializer[Clarification]):
+    """One question the agent asked before writing code, with its answer."""
+
+    is_answered = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Clarification
+        fields = (
+            "id",
+            "task",
+            "order_index",
+            "round",
+            "key",
+            "question",
+            "kind",
+            "options",
+            "allow_custom",
+            "rationale",
+            "answer",
+            "is_answered",
+            "answered_at",
+            "created_at",
+        )
+        read_only_fields = (
+            "id",
+            "task",
+            "order_index",
+            "round",
+            "key",
+            "question",
+            "kind",
+            "options",
+            "allow_custom",
+            "rationale",
+            "is_answered",
+            "answered_at",
+            "created_at",
+        )
+
+
+class ClarificationAnswerItemSerializer(serializers.Serializer[dict[str, Any]]):
+    """One answer inside a batch."""
+
+    id = serializers.IntegerField(min_value=1)
+    answer = serializers.CharField(min_length=1, max_length=2000, trim_whitespace=True)
+
+
+class ClarificationAnswersSerializer(serializers.Serializer[dict[str, Any]]):
+    """Request body for answering the outstanding questions.
+
+    Answers are submitted as a batch because they are decided together: only
+    when every question in the round is answered does the run resume, so the
+    agent always sees a complete picture instead of a half-filled one.
+    """
+
+    answers = ClarificationAnswerItemSerializer(many=True, allow_empty=False)
+
+    def validate_answers(self, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Reject a batch that names the same question twice."""
+        ids = [item["id"] for item in value]
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError("Each question may be answered only once.")
+        return value
 
 
 class ProposedChangeSerializer(serializers.ModelSerializer[ProposedChange]):
@@ -87,6 +152,7 @@ class AgentTaskSummarySerializer(serializers.ModelSerializer[AgentTask]):
 
     repository_full_name = serializers.CharField(source="repository.full_name", read_only=True)
     awaiting_decision = serializers.BooleanField(read_only=True)
+    awaiting_answers = serializers.BooleanField(read_only=True)
     is_terminal = serializers.BooleanField(read_only=True)
     total_tokens = serializers.IntegerField(read_only=True)
 
@@ -103,6 +169,7 @@ class AgentTaskSummarySerializer(serializers.ModelSerializer[AgentTask]):
             "base_branch",
             "feature_branch",
             "awaiting_decision",
+            "awaiting_answers",
             "is_terminal",
             "total_tokens",
             "cached_tokens",
@@ -116,6 +183,8 @@ class AgentTaskSummarySerializer(serializers.ModelSerializer[AgentTask]):
 
 class AgentTaskDetailSerializer(AgentTaskSummarySerializer):
     """Full task state, including agent output and verification results."""
+
+    clarifications = ClarificationSerializer(many=True, read_only=True)
 
     class Meta(AgentTaskSummarySerializer.Meta):
         fields: tuple[str, ...] = (
@@ -138,6 +207,7 @@ class AgentTaskDetailSerializer(AgentTaskSummarySerializer):
             "started_at",
             "finished_at",
             "duration_seconds",
+            "clarifications",
         )
         read_only_fields = fields
 
@@ -191,6 +261,9 @@ __all__: list[str] = [
     "AgentTaskCreateSerializer",
     "AgentTaskDetailSerializer",
     "AgentTaskSummarySerializer",
+    "ClarificationAnswerItemSerializer",
+    "ClarificationAnswersSerializer",
+    "ClarificationSerializer",
     "MessageCreateSerializer",
     "MessageSerializer",
     "ProposedChangeDecisionSerializer",

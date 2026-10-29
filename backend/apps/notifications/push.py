@@ -46,11 +46,13 @@ _JWT_TTL_SECONDS = 3600
 #: Refresh the OAuth token this many seconds before Google expires it.
 _TOKEN_LEEWAY_SECONDS = 60
 
-#: Statuses worth waking a phone for: the run needs the user's decision, or it
-#: reached a terminal outcome the user is waiting on. ``cancelled`` is excluded
-#: -- the user cancelled it themselves -- as are all in-flight states.
+#: Statuses worth waking a phone for: the run needs the user's decision or
+#: answers, or it reached a terminal outcome the user is waiting on.
+#: ``cancelled`` is excluded -- the user cancelled it themselves -- as are all
+#: in-flight states.
 PUSH_NOTIFY_STATUSES: frozenset[str] = frozenset(
     {
+        AgentTask.Status.CLARIFYING,
         AgentTask.Status.AWAITING_APPROVAL,
         AgentTask.Status.PUSHED,
         AgentTask.Status.MERGED,
@@ -357,6 +359,13 @@ def task_push_copy(task: AgentTask, status: str) -> tuple[str, str] | None:
     label = (task.title or task.prompt or "Your task").strip()
     label = label[:120]
 
+    if status == AgentTask.Status.CLARIFYING:
+        count = task.clarifications.filter(answer="").count() if task.pk else 0
+        noun = "question" if count == 1 else "questions"
+        return (
+            "A few questions first",
+            f"“{label}” needs {count or 'a few'} {noun} answered before the agent starts.",
+        )
     if status == AgentTask.Status.AWAITING_APPROVAL:
         return "Changes ready to review", f"“{label}” is waiting for your approval."
     if status == AgentTask.Status.PUSHED:

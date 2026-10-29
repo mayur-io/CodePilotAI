@@ -14,9 +14,15 @@ from typing import Any
 
 import pytest
 
-from apps.agent.runner import run_execution_stage, run_planning_stage
+from apps.agent.runner import run_clarify_stage, run_execution_stage, run_planning_stage
 from apps.agent.verify import CommandOutcome, VerificationResult
-from apps.agent_tasks.models import AgentTask, Message, ProposedChange, RunEvent
+from apps.agent_tasks.models import (
+    AgentTask,
+    Clarification,
+    Message,
+    ProposedChange,
+    RunEvent,
+)
 from apps.repositories.models import Branch
 
 pytestmark = pytest.mark.django_db
@@ -396,3 +402,161 @@ class TestExecutionStage:
         task.refresh_from_db()
         assert task.status == AgentTask.Status.FAILED
         assert task.error_code == "internal_error"
+
+
+class TestClarifyStage:
+    """The clarify phase: ask first, or fall through when the ask is unambiguous."""
+
+    def _questions(self, *keys: str) -> list[dict[str, Any]]:
+        return [
+            {
+                "key": key,
+                "question": f"Which {key}?",
+                "kind": "single_choice",
+                "options": [
+                    {"value": "python", "label": "Python"},
+                    {"value": "javascript", "label": "JavaScript"},
+                ],
+            }
+            for key in keys
+        ]
+
+    def test_a_question_batch_pauses_in_clarifying(
+        self,
+        git_workspace: Any,
+        task: AgentTask,
+        scripted_provider: Any,
+        tool_completion: Any,
+    ) -> None:
+        provider = scripted_provider(
+            [tool_completion("ask_questions", {"questions": self._questions("language", "styling")})]
+        )
+
+        run_clarify_stage(task, provider=provider)
+
+        task.refresh_from_db()
+        assert task.status == AgentTask.Status.CLARIFYING
+        assert task.phase == AgentTask.Phase.CLARIFY
+        assert task.awaiting_answers
+        # No code was proposed: pausing is the whole point.
+        assert task.proposed_changes.count() == 0
+
+        rows = list(task.clarifications.order_by("order_index"))
+        assert [row.key for row in rows] == ["language", "styling"]
+        assert all(row.round == 1 for row in rows)
+        assert all(not row.is_answered for row in rows)
+
+        # Every question is announced so the app can render it live.
+        assert len(events_of(task, RunEvent.Kind.CLARIFICATION)) == 2
+        event = events_of(task, RunEvent.Kind.CLARIFICATION)[0]
+        assert event.payload["key"] == "language"
+        assert len(event.payload["options"]) == 2
+
+    def test_skip_falls_through_into_planning(
+        self,
+        git_workspace: Any,
+        task: AgentTask,
+        scripted_provider: Any,
+        tool_completion: Any,
+        answer_completion: Any,
+    ) -> None:
+        """A well-specified task never pays for a second round trip."""
+        provider = scripted_provider(
+            [
+                tool_completion("skip", {"reason": "The task is fully specified."}),
+                # The planning stage then runs in the same invocation.
+                answer_completion("Read the repository."),
+                tool_completion(
+                    "propose_change",
+                    {
+                        "path": "app.py",
+                        "change_type": "modify",
+                        "patch": MODIFY_APP_PY,
+                        "rationale": "Add a helper.",
+                    },
+                ),
+                tool_completion("finish", {"summary": "Added a helper."}),
+            ]
+        )
+
+        run_clarify_stage(task, provider=provider)
+
+        task.refresh_from_db()
+        assert task.status == AgentTask.Status.AWAITING_APPROVAL
+        assert task.clarifications.count() == 0
+        assert task.proposed_changes.count() == 1
+
+    def test_a_second_round_gets_a_higher_round_number(
+        self,
+        git_workspace: Any,
+        task: AgentTask,
+        scripted_provider: Any,
+        tool_completion: Any,
+    ) -> None:
+        first = scripted_provider(
+            [tool_completion("ask_questions", {"questions": self._questions("language")})]
+        )
+        run_clarify_stage(task, provider=first)
+        task.refresh_from_db()
+        # Answer to leave clarifying, then ask again.
+        row = task.clarifications.get()
+        row.answer_with("python")
+        row.save(update_fields=["answer", "answered_at"])
+        task.status = AgentTask.Status.QUEUED
+        task.save(update_fields=["status"])
+
+        second = scripted_provider(
+            [tool_completion("ask_questions", {"questions": self._questions("styling")})]
+        )
+        run_clarify_stage(task, provider=second)
+
+        tasks_rows = task.clarifications.order_by("round", "order_index")
+        assert [r.round for r in tasks_rows] == [1, 2]
+        assert task.pending_clarifications.get().key == "styling"
+
+    def test_answered_decisions_reach_the_planning_prompt(
+        self,
+        git_workspace: Any,
+        task: AgentTask,
+        scripted_provider: Any,
+        tool_completion: Any,
+        answer_completion: Any,
+    ) -> None:
+        """Answers given in an earlier round are constraints, not re-asked."""
+        row = Clarification.objects.create(
+            task=task,
+            key="language",
+            question="Which language?",
+            kind=Clarification.Kind.SINGLE_CHOICE,
+            options=[{"value": "python", "label": "Python"}],
+        )
+        row.answer_with("python")
+        row.save(update_fields=["answer", "answered_at"])
+
+        provider = scripted_provider(
+            [
+                answer_completion("Read the agreed decisions."),
+                tool_completion(
+                    "propose_change",
+                    {
+                        "path": "app.py",
+                        "change_type": "modify",
+                        "patch": MODIFY_APP_PY,
+                        "rationale": "Add a helper.",
+                    },
+                ),
+                tool_completion("finish", {"summary": "Added a helper."}),
+            ]
+        )
+
+        run_planning_stage(task, provider=provider)
+
+        # The decision is in the prompt the model actually saw. The second call
+        # is the planning turn; the decisions ride on its task message.
+        prompt_text = "\n".join(
+            str(getattr(message, "content", "")) for message in provider.calls[1]
+        )
+        assert "Decisions already agreed" in prompt_text
+        assert "python" in prompt_text
+        task.refresh_from_db()
+        assert task.status == AgentTask.Status.AWAITING_APPROVAL

@@ -12,7 +12,7 @@ from typing import Any
 
 from celery import shared_task
 
-from apps.agent.runner import run_execution_stage, run_planning_stage
+from apps.agent.runner import run_clarify_stage, run_execution_stage
 from apps.agent_tasks.models import AgentTask
 from config.observability import get_logger
 
@@ -37,10 +37,17 @@ _EXECUTION_STATUSES = frozenset(
 def run_agent_task(self: Any, task_id: int) -> str:
     """Advance one agent task to its natural stopping point.
 
-    Dispatch is by current status: ``QUEUED`` runs the planning stage
-    (proposals -> ``awaiting_approval``); any post-approval status runs the
-    execution stage (apply -> verify -> repair -> commit -> push). Terminal
-    statuses (failed, cancelled, pushed, merged) are left alone.
+    Dispatch is by current status:
+
+    * ``QUEUED`` -- a brand-new task, or one whose answers just arrived. The
+      pipeline starts with the clarify phase, which either pauses in
+      ``CLARIFYING`` or falls through into planning in the same run.
+    * any post-approval status -- the execution stage
+      (apply -> verify -> repair -> commit -> push).
+
+    Terminal statuses (failed, cancelled, pushed, merged) are left alone.
+    ``CLARIFYING`` is deliberately *not* dispatchable: only the answers
+    endpoint moves a task out of it, so a redelivered message cannot re-ask.
     """
     try:
         task = AgentTask.objects.get(pk=task_id)
@@ -49,8 +56,8 @@ def run_agent_task(self: Any, task_id: int) -> str:
         return "missing"
 
     if task.status == AgentTask.Status.QUEUED:
-        run_planning_stage(task)
-        return "planned"
+        run_clarify_stage(task)
+        return "clarified"
     if task.status in _EXECUTION_STATUSES:
         run_execution_stage(task)
         return "executed"

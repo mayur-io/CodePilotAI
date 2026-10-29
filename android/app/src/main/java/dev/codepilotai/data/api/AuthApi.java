@@ -23,6 +23,9 @@ public interface AuthApi {
     @GET("auth/me")
     Single<dev.codepilotai.data.api.dto.UserDto> me();
 
+    @POST("auth/refresh")
+    Single<TokenPairDto> refresh(@Body Map<String, String> refresh);
+
     @POST("auth/logout")
     Single<LogoutResultDto> logout(@Body Map<String, String> refresh);
 }

@@ -14,6 +14,7 @@ public final class LabelsTest {
     public void phaseLabelRes_coversEveryPhase() {
         assertThat(Labels.phaseLabelRes(TaskPhase.QUEUED)).isEqualTo(R.string.phase_queued);
         assertThat(Labels.phaseLabelRes(TaskPhase.PLAN)).isEqualTo(R.string.phase_planning);
+        assertThat(Labels.phaseLabelRes(TaskPhase.CLARIFY)).isEqualTo(R.string.phase_clarifying);
         assertThat(Labels.phaseLabelRes(TaskPhase.PROPOSE))
                 .isEqualTo(R.string.phase_drafting_changes);
         assertThat(Labels.phaseLabelRes(TaskPhase.AWAIT_APPROVAL))
@@ -41,6 +42,8 @@ public final class LabelsTest {
     public void statusLabelRes_coversKeyStates() {
         assertThat(Labels.statusLabelRes(TaskStatus.AWAITING_APPROVAL))
                 .isEqualTo(R.string.status_awaiting_approval);
+        assertThat(Labels.statusLabelRes(TaskStatus.CLARIFYING))
+                .isEqualTo(R.string.status_clarifying);
         assertThat(Labels.statusLabelRes(TaskStatus.PUSHED)).isEqualTo(R.string.status_pushed);
         assertThat(Labels.statusLabelRes(TaskStatus.MERGED)).isEqualTo(R.string.status_merged);
         assertThat(Labels.statusLabelRes(TaskStatus.FAILED)).isEqualTo(R.string.status_failed);

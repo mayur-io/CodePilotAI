@@ -95,6 +95,15 @@ public final class RunFragment extends Fragment {
                     ok ? R.drawable.dot_connected : R.drawable.dot_disconnected);
         });
 
+        viewModel.clarifyRequired().observe(getViewLifecycleOwner(), id -> {
+            if (id != null) {
+                Bundle args = new Bundle();
+                args.putLong("taskId", id);
+                NavHostFragment.findNavController(this)
+                        .navigate(R.id.action_run_to_clarify, args);
+            }
+        });
+
         viewModel.approvalRequired().observe(getViewLifecycleOwner(), id -> {
             if (id != null) {
                 Bundle args = new Bundle();

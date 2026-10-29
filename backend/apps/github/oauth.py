@@ -63,7 +63,10 @@ def exchange_code_for_token(code: str) -> dict[str, str | int | None]:
         "code": code,
         "redirect_uri": settings.GITHUB_REDIRECT_URI,
     }
-    headers = {"Accept": "application/json", "Content-Type": "application/json"}
+    # `data=` makes httpx send application/x-www-form-urlencoded, which is what
+    # GitHub expects. Do NOT force Content-Type: application/json here: GitHub
+    # then tries to parse the form body as JSON and answers with a bare HTTP 400.
+    headers = {"Accept": "application/json"}
 
     try:
         with httpx.Client(timeout=20.0) as client:

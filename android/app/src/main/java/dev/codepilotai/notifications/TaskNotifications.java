@@ -27,11 +27,17 @@ public final class TaskNotifications {
 
     /**
      * Show a task-update notification. Tapping it opens {@link MainActivity} with
-     * the task id, which routes to the run screen.
+     * the task id, which routes to the run screen (or straight to the clarify
+     * screen when the agent is waiting for answers).
      */
     @SuppressLint("MissingPermission") // Guarded by areNotificationsEnabled().
     public static void show(
-            Context context, String channelId, String title, String body, @Nullable String taskId) {
+            Context context,
+            String channelId,
+            String title,
+            String body,
+            @Nullable String taskId,
+            @Nullable String status) {
         String channel = channelId == null || channelId.trim().isEmpty() ? DEFAULT_CHANNEL_ID : channelId;
         ensureChannel(context, channel);
 
@@ -40,7 +46,7 @@ public final class TaskNotifications {
             return;
         }
 
-        Intent intent = MainActivity.taskIntent(context, taskId);
+        Intent intent = MainActivity.taskIntent(context, taskId, status);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pending = PendingIntent.getActivity(context, NOTIFICATION_ID, intent, flags);
 

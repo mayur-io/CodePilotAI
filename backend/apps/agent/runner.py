@@ -25,6 +25,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 
 from apps.agent.apply import apply_approved_changes
 from apps.agent.budget import Budget
+from apps.agent.clarify import ClarifyController, run_clarify
 from apps.agent.commit import deterministic_subject, run_commit_phase
 from apps.agent.context import (
     build_repo_map,
@@ -48,7 +49,7 @@ from apps.agent.repair import RepairController, run_repair
 from apps.agent.tools import ToolRegistry
 from apps.agent.verify import VerificationResult, run_verification
 from apps.agent_tasks import events
-from apps.agent_tasks.models import AgentTask, Message, ProposedChange, RunEvent
+from apps.agent_tasks.models import AgentTask, Clarification, Message, ProposedChange, RunEvent
 from apps.git.errors import GitCommandError
 from apps.git.patch import diffstat
 from apps.git.worktree import changed_files, create_worktree, push_branch
@@ -59,6 +60,7 @@ logger = get_logger(__name__)
 
 __all__: list[str] = [
     "build_provider",
+    "run_clarify_stage",
     "run_execution_stage",
     "run_planning_stage",
 ]
@@ -78,6 +80,23 @@ def build_provider() -> GroqProvider:
 
 
 # ── stage entry points ────────────────────────────────────────────────────────
+
+
+def run_clarify_stage(task: AgentTask, *, provider: Provider | None = None) -> None:
+    """Run a queued task through the clarify phase.
+
+    Ends in ``clarifying`` (questions outstanding) or hands straight over to the
+    planning stage when the agent decides nothing needs asking.
+    """
+    token = _task_token(task)
+    owns = provider is None
+    if provider is None:
+        provider = build_provider()
+    try:
+        _run_stage(task, provider, token, _clarify)
+    finally:
+        if owns:
+            _close(provider)
 
 
 def run_planning_stage(task: AgentTask, *, provider: Provider | None = None) -> None:
@@ -104,6 +123,71 @@ def run_execution_stage(task: AgentTask, *, provider: Provider | None = None) ->
     finally:
         if owns:
             _close(provider)
+
+
+def _clarify(task: AgentTask, provider: Provider, token: str, budget: Budget) -> None:
+    """Let the agent ask a bounded round of questions before any code is written.
+
+    The worktree is created here too, so the agent's questions can be informed by
+    the repository's actual contents (it can see the repo map and the detected
+    stack) rather than only the prompt text.
+    """
+    events.set_status(task, AgentTask.Status.RUNNING)
+    events.set_phase(task, AgentTask.Phase.CLARIFY, note=phase_hint("clarify"))
+
+    worktree = create_worktree(
+        repository=task.repository,
+        task_id=task.pk,
+        branch=task.feature_branch,
+        token=token,
+    )
+    detection = detect_toolchain(worktree)
+    context = _context_for(task, detection)
+    system = system_message(context)
+    task.detected_stack = detection
+    task.save(update_fields=["detected_stack", "updated_at"])
+
+    controller = ClarifyController()
+    result = run_clarify(
+        provider=provider,
+        controller=controller,
+        system=system,
+        task=user_task_message(_clarify_prompt(task)),
+        budget=budget,
+        reasoning_effort=REASONING_EFFORT_BY_PHASE["clarify"],
+        max_tool_calls=settings.AGENT_MAX_TOOL_CALLS,
+    )
+    _record_usage(task, budget)
+
+    if not result.should_pause:
+        # Nothing worth asking: go straight on to planning in the same run so a
+        # well-specified task never pays for an extra round trip.
+        logger.info("clarify_skipped", task_id=task.pk)
+        _plan(task, provider, token, budget)
+        return
+
+    with transaction.atomic():
+        next_round = _next_clarification_round(task)
+        for index, draft in enumerate(result.questions):
+            row = Clarification.objects.create(
+                task=task,
+                order_index=index,
+                round=next_round,
+                key=draft.key,
+                question=draft.question,
+                kind=draft.kind,
+                options=list(draft.options),
+                allow_custom=draft.allow_custom,
+                rationale=draft.rationale,
+            )
+            events.announce_clarification(task, row)
+
+        task.agent_reasoning = _collapse_reasoning(
+            [task.agent_reasoning, *result.reasoning]
+        )
+        task.save(update_fields=["agent_reasoning", "updated_at"])
+        events.set_status(task, AgentTask.Status.CLARIFYING)
+        events.set_phase(task, AgentTask.Phase.CLARIFY, note="Waiting for your answers.")
 
 
 # ── planning ──────────────────────────────────────────────────────────────────
@@ -297,8 +381,11 @@ def _execute(task: AgentTask, provider: Provider, token: str, budget: Budget) ->
 
 
 def _task_prompt(task: AgentTask) -> str:
-    """The prompt, followed by any follow-up instructions already on record."""
+    """The prompt, plus the agreed decisions and any follow-up instructions."""
     content = task.prompt
+    decisions = task.answered_clarifications_text()
+    if decisions:
+        content += "\n\n" + decisions
     followups = [
         message.content
         for message in Message.recent_for_prompt(task, limit=8)
@@ -307,6 +394,21 @@ def _task_prompt(task: AgentTask) -> str:
     if followups:
         content += "\n\nFollow-up instructions:\n" + "\n".join(followups)
     return content
+
+
+def _clarify_prompt(task: AgentTask) -> str:
+    """The clarify brief, carrying any answers already given in an earlier round."""
+    parts = [task.prompt]
+    decisions = task.answered_clarifications_text()
+    if decisions:
+        parts += [
+            "",
+            "The user has already answered these; treat them as fixed and do not "
+            "ask about them again:",
+            decisions,
+        ]
+    parts += ["", phase_hint("clarify")]
+    return "\n".join(parts)
 
 
 def _propose_prompt(task: AgentTask) -> str:
@@ -566,6 +668,12 @@ def _context_for(task: AgentTask, detection: dict[str, Any]) -> PromptContext:
 
 def _task_token(task: AgentTask) -> str:
     return task.user.github_access_token
+
+
+def _next_clarification_round(task: AgentTask) -> int:
+    """The round number a new batch of questions belongs to (1-based)."""
+    latest = task.clarifications.order_by("-round").values_list("round", flat=True).first()
+    return (latest or 0) + 1
 
 
 def _collapse_reasoning(chunks: list[str], limit: int = 30_000) -> str:

@@ -7,6 +7,8 @@ import dev.codepilotai.data.api.SseClient;
 import dev.codepilotai.data.api.TasksApi;
 import dev.codepilotai.data.api.dto.ChangeDto;
 import dev.codepilotai.data.api.dto.ChangeDecisionRequest;
+import dev.codepilotai.data.api.dto.ClarificationAnswersRequest;
+import dev.codepilotai.data.api.dto.ClarificationDto;
 import dev.codepilotai.data.api.dto.CreateTaskRequest;
 import dev.codepilotai.data.api.dto.FollowUpRequest;
 import dev.codepilotai.data.api.dto.MessageDto;
@@ -22,6 +24,7 @@ import dev.codepilotai.data.db.entity.TaskEntity;
 import dev.codepilotai.domain.model.AgentTask;
 import dev.codepilotai.domain.model.AgentTaskDetail;
 import dev.codepilotai.domain.model.ChatMessage;
+import dev.codepilotai.domain.model.Clarification;
 import dev.codepilotai.domain.model.ProposedChange;
 import dev.codepilotai.domain.model.RunEvent;
 import io.reactivex.rxjava3.core.Completable;
@@ -162,6 +165,41 @@ public final class TaskRepository {
                 .map(MessageDto::toDomain)
                 .onErrorResumeNext(t -> Single.error(ApiException.from(t)))
                 .subscribeOn(Schedulers.io());
+    }
+
+    // ── clarifications ───────────────────────────────────────────────────────
+
+    /** The questions the agent asked, latest round first. */
+    public Single<List<Clarification>> questions(long taskId) {
+        return api.questions(taskId)
+                .map(TaskRepository::toClarifications)
+                .onErrorResumeNext(t -> Single.error(ApiException.from(t)))
+                .subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Submit the answers for the outstanding round and resume the run.
+     *
+     * <p>The whole round goes in one request: the backend refuses a partial
+     * batch, so the agent never runs on an incomplete set of decisions.
+     */
+    public Single<List<Clarification>> answerQuestions(
+            long taskId, List<ClarificationAnswersRequest.Item> answers) {
+        return api.answerQuestions(taskId, new ClarificationAnswersRequest(answers))
+                .map(TaskRepository::toClarifications)
+                .onErrorResumeNext(t -> Single.error(ApiException.from(t)))
+                .subscribeOn(Schedulers.io());
+    }
+
+    private static List<Clarification> toClarifications(List<ClarificationDto> dtos) {
+        List<Clarification> out = new ArrayList<>();
+        if (dtos == null) {
+            return out;
+        }
+        for (ClarificationDto dto : dtos) {
+            out.add(dto.toDomain());
+        }
+        return out;
     }
 
     // ── events & streaming ───────────────────────────────────────────────────
